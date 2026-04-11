@@ -17,10 +17,14 @@ def upload_results(results, gs_bucket, gs_relative_path='stress-tests'):
         content_type="application/json"
     )
 
-def get_gcp_endpoint_paths(endpoint: dict, number: str, region: str, project_id: str):
-    endpoint_path = f"{endpoint['id']}.{region}-{number}.prediction.vertexai.goog" if endpoint['is-dedicated'] else f"{region}-aiplatform.googleapis.com"
-    resource_path = f"projects/{project_id}/locations/{region}/endpoints/{endpoint['id']}"
-    return f"https://{endpoint_path}/v1/{resource_path}/invoke/predict"
+def get_gcp_endpoint_paths(endpoint: dict, project: dict, region: str):
+    number = project['number']
+    project_id = project['id']
+    #region = project['region']
+    endpoint_id = endpoint['id'][region]
+    endpoint_path = f"{endpoint_id}.{region}-{number}.prediction.vertexai.goog" if endpoint['is-dedicated'] else f"{region}-aiplatform.googleapis.com"
+    resource_path = f"projects/{project_id}/locations/{region}/endpoints/{endpoint_id}"
+    return f"https://{endpoint_path}/v1/{resource_path}/invoke" if endpoint['is-dedicated'] else f"https://{endpoint_path}/v1/{resource_path}"
 
 def submit_request(payload_dict, url, session, stream=True):
     response = session.post(url, json=payload_dict, stream=stream, timeout=(5.0, 60.0))
@@ -28,10 +32,10 @@ def submit_request(payload_dict, url, session, stream=True):
     if response.status_code != 200:
         raise Exception(f"Request failed with status {response.status_code}: {response.text}")
     if stream:
-        # Iterate over the raw HTTP bytes as they arrive
-        for line in response.iter_lines(decode_unicode=True):
-            if line and line.startswith("data: "):
-                yield line
+        for chunk in response.iter_content(chunk_size=None):
+        #for chunk in response.iter_lines():
+            if chunk:
+                yield chunk
     else:
         yield response.json()
 

@@ -1,3 +1,4 @@
 **/__pycache__/**
 .env.yaml
+config.yaml
 data

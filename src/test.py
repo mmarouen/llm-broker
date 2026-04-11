@@ -1,27 +1,27 @@
 from concurrent.futures import ThreadPoolExecutor
 import time
 import uuid
+import json
 import random
 from .metrics import StageReport
 from .utils import submit_request, summarize
+from .api import get_payload, InferenceRequest
 
-def worker_loop(stop_time, prompt_bank, stream, http_session, url, metrics, model, backend):
+def worker_loop(stop_time, prompt_bank, http_session, url, metrics, model, request: InferenceRequest):
     while time.time() < stop_time:
         base_prompt = random.choice(prompt_bank)
         # 2. Add a unique ID to ensure no cache hits
         request_id = uuid.uuid4()
         unique_prompt = f"[Request ID: {request_id}]: {base_prompt} [Request ID: {request_id}]"
         data = None
-        if backend == "gcp_endpoint":
-            data = {
-                "instances": [{"text": unique_prompt}],
-                "stream": stream,
-                "collect_kpis": True
-            }
-        elif backend == "claude":
+        request.query = unique_prompt
+        request.collect_kpis = True
+        if "gcp" in request.node:
+            data = get_payload(req=request)
+        elif request.node == "claude":
             data = {
                 "model": model,
-                "max_tokens": 600,
+                "max_tokens": request.max_new_tokens,
                 "messages": [{"role": "user", "content": unique_prompt}]
             }
         latency = -1
@@ -31,8 +31,8 @@ def worker_loop(stop_time, prompt_bank, stream, http_session, url, metrics, mode
         tps = -1
         start_time = time.time()
         try:
-            if backend == "gcp_endpoint":
-                response_iter = submit_request(data, url=url, stream=stream, session=http_session)
+            if request.node == "gcp-endpoint":
+                response_iter = submit_request(data, url=url, stream=request.stream, session=http_session)
                 result = next(response_iter)
                 latency = time.time() - start_time
                 pred = result["predictions"][0]
@@ -40,8 +40,27 @@ def worker_loop(stop_time, prompt_bank, stream, http_session, url, metrics, mode
                 output_tokens = pred.get("output_tokens", -1)
                 input_tokens = pred.get("input_tokens", -1)
                 tps = pred.get("tps", 0)
-
-            elif backend == "claude":
+            elif request.node == "gcp-triton":
+                response_iter = submit_request(data, url=url, stream=request.stream, session=http_session)
+                '''
+                total_output_tokens = 0
+                for chunk in response_iter:
+                    try:
+                        parsed = json.loads(chunk.decode("utf-8"))
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        continue
+                    ttft = time.time() - start_time
+                    outputs = parsed.get("outputs", [])
+                    for out in outputs:
+                        if out["name"] == "output_log_probs":
+                            total_output_tokens += out["shape"][-1]
+                '''
+                json_result = next(response_iter)["outputs"]
+                latency = time.time() - start_time
+                output_token_ = next((d for d in json_result if d["name"] == "output_log_probs"), None)
+                output_tokens = output_token_["shape"][-1]
+                tps = output_tokens / latency if latency > 0 and output_tokens > 0 else -1
+            elif request.node == "claude":
                 response = http_session.post(url, json=data)
                 if response.status_code == 429:
                     retry_after = float(response.headers.get("Retry-After", 2.0))
@@ -70,11 +89,10 @@ def run_stress_test(
         concurrency,
         duration,
         prompt_bank,
-        stream,
         session,
         url,
         model,
-        backend
+        request
         ) -> StageReport:
     metrics = []
     with ThreadPoolExecutor(max_workers=concurrency) as executor:
@@ -83,12 +101,11 @@ def run_stress_test(
                 worker_loop,
                 stop_time,
                 prompt_bank,
-                stream,
                 session,
                 url,
                 metrics,
                 model,
-                backend
+                request
             )
         # Wait for the duration of the stage
         while time.time() < stop_time:
