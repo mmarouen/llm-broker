@@ -1,6 +1,6 @@
 # 🧠 llm-broker
 
-Internal orchestration layer for LLM routing, multi-provider inference, and load testing. Sits between consumers and inference backends — no model weights, no inference logic.
+Internal orchestration layer for LLM routing, multi-provider inference, and load testing. Sits between consumers and inference backends, no model weights, no inference logic.
 Current implementation runs for GCP endpoint or a SaaS LLM provider.
 
 ---
@@ -101,9 +101,6 @@ config['models']['mistral-7b'] = {
 }
 ```
 
-As of now, the repo is unusable without substantial modification to the node retrieval and storage paths because most endpoint information and model ids are sensitive information.
-Config file isnt uploaded along with the repository
-
 The `node` field in requests controls routing:
 - Nodes containing `"gcp"` → routed to `inference-gateway`, using the configured model name
 - Other nodes → routed to Claude (`CLAUDE_MODEL`)
@@ -118,8 +115,9 @@ Currently hardcoded to `europe-west3`. Configurable via `REGION` in `app.py`.
 
 ## Getting Started
 
-> _TODO_
+Config file isnt uploaded along with the repository. So the repository isnt usable without configuring your own GCP project and endpoints.
 
+However, a dummy config file `dummy-config.yaml` could be filled up and renamed to `config.yaml` and used instead.
 ---
 
 ## Deployment
@@ -142,7 +140,7 @@ Currently hardcoded to `europe-west3`. Configurable via `REGION` in `app.py`.
 
 ## Contributing
 
-> _TODO_
+Reach out to [mmmarouen](https://github.com/mmarouen)
 
 ---
 
