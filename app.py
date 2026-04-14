@@ -46,7 +46,8 @@ def health():
 @app.post("/completions")
 def completions(req: InferenceRequest):
     print(f'Received request {req}')
-    endpoint = config['models'].get([req.model]['endpoint'], None)
+    endpoint = config['models'].get(req.model, {}).get('endpoint', {})
+    
     url, session = get_connexion_params(req.node, endpoint=endpoint, project=project, region=REGION)
     payload = get_payload(req)
     generator = submit_request(payload, url=url, stream=req.stream, session=session)
@@ -57,7 +58,7 @@ def completions(req: InferenceRequest):
 
 @app.post("/run_test")
 def run_test(req: InferenceRequest):
-    endpoint = config['models'].get([req.model]['endpoint'], None)
+    endpoint = config['models'].get(req.model, {}).get('endpoint', {})
     url, session = get_connexion_params(req.node, endpoint=endpoint, project=project, region=REGION)
     print(f'url {url}')
     #logging.info(f'Querying node {req.node}: {url}')
