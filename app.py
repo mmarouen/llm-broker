@@ -46,7 +46,7 @@ def health():
 @app.post("/completions")
 def completions(req: InferenceRequest):
     print(f'Received request {req}')
-    endpoint = config['models'][req.model]['endpoint']
+    endpoint = config['models'].get([req.model]['endpoint'], None)
     url, session = get_connexion_params(req.node, endpoint=endpoint, project=project, region=REGION)
     payload = get_payload(req)
     generator = submit_request(payload, url=url, stream=req.stream, session=session)
@@ -57,9 +57,7 @@ def completions(req: InferenceRequest):
 
 @app.post("/run_test")
 def run_test(req: InferenceRequest):
-
-    endpoint = config['models'][req.model]['endpoint']
-    storage = config['models'][req.model]['storage']
+    endpoint = config['models'].get([req.model]['endpoint'], None)
     url, session = get_connexion_params(req.node, endpoint=endpoint, project=project, region=REGION)
     print(f'url {url}')
     #logging.info(f'Querying node {req.node}: {url}')
@@ -88,7 +86,7 @@ def run_test(req: InferenceRequest):
 
         logging.info(f"Stress test log {json.dumps(record)}")
         results.append(record)
-    upload_results(results=results, gs_bucket=storage['bucket'])
+    upload_results(results=results, gs_bucket=config['stresstest-bucket'])
     logging.info(f"Results uploaded to gcp")
     return results
 
