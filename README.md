@@ -1,6 +1,7 @@
 # 🧠 llm-broker
 
 Internal orchestration layer for LLM routing, multi-provider inference, and load testing. Sits between consumers and inference backends — no model weights, no inference logic.
+Current implementation runs for GCP endpoint or a SaaS LLM provider.
 
 ---
 
@@ -11,7 +12,6 @@ Internal orchestration layer for LLM routing, multi-provider inference, and load
 It talks to:
 - **[`llm-multiserve`](https://github.com/mmarouen/llm-multiserve)** — self-hosted models on GCP (vLLM, PyTorch, TensorRT-LLM)
 - **Anthropic (Claude)** — managed API
-- **OpenAI (GPT)** — managed API
 
 It does **not** hold any inference logic. All model execution is delegated downstream.
 
@@ -22,20 +22,15 @@ It does **not** hold any inference logic. All model execution is delegated downs
 ```
 llm-platform/
 ├── app.py                    # FastAPI entrypoint
-├── config.py                 # Model registry + provider config
-├── clients/                  # One module per downstream provider
-│   ├── gateway.py            # → inference-gateway (GCP)
-│   ├── anthropic.py          # → Claude API
-│   └── openai.py             # → GPT API
-├── routing/                  # Provider selection logic
-├── stress/                   # Load testing (stages, runners)
-│   ├── runner.py             # run_stress_test logic
-│   └── prompts.py            # Prompt banks (e.g. LISO_PROMPTS)
-├── kpis/                     # KPI computation + metrics models
-├── storage/                  # GCS upload helpers
-└── requirements/
-    ├── base.txt
-    └── dev.txt
+├── config/config.py          # Model registry + provider config
+├── src/                      
+│   ├── api.py                # build payload + collects inference url
+│   ├── metrics.py            # computes aggregated metrics: latency, trhoughput, ttft...
+│   ├── test.py               # stress test logic
+│   ├── utils.py              # some tooling
+│   └── prompts.py            # prompt bank
+├── Dockerfile                # 
+├── requirements.txt          # runtime + gcp dependencies
 ```
 
 ---
@@ -52,21 +47,24 @@ Health check.
 ---
 
 ### `POST /completions`
-Route an inference request to the appropriate backend. Supports streaming.
+Route an inference request to the appropriate backend for completions. Supports streaming.
 
 **Request:**
 ```json
 {
-  "model": "mistral-7b",
-  "node": "gcp-europe-west3",
+  "node": "gcp-endpoint",
+  "model": "gcp-europe-west3",
   "prompt": "Summarize the following...",
   "stream": true
 }
 ```
 
 - If `stream: true`, returns a `text/event-stream` response.
-- The `node` field determines which provider and connection params to use.
-- The `model` field is looked up in `config['models']` to resolve the downstream endpoint.
+- The `node` field determines which provider and connection params to use, can either be `claude` or `gcp-endpoint`
+- The `model` field depens on `node`: 
+    - if `node` is `gcp-endpoint`: looked up in `config['models']` to resolve the downstream endpoint.
+    It can be one of `llama-3.2-pytorch`, `llama-3.2-vllm`, `llama-3.2-trtllm`
+    - if `node` is `claude`: model is `claude-sonnet-4-6`
 
 ---
 
@@ -102,6 +100,9 @@ config['models']['mistral-7b'] = {
     }
 }
 ```
+
+As of now, the repo is unusable without substantial modification to the node retrieval and storage paths because most endpoint information and model ids are sensitive information.
+Config file isnt uploaded along with the repository
 
 The `node` field in requests controls routing:
 - Nodes containing `"gcp"` → routed to `inference-gateway`, using the configured model name
@@ -147,4 +148,4 @@ Currently hardcoded to `europe-west3`. Configurable via `REGION` in `app.py`.
 
 ## License
 
-> _TODO_
+[LICENSE](LICENSE)
