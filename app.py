@@ -25,7 +25,7 @@ CLAUDE_MODEL = 'claude-sonnet-4-6'
 STAGES = [
     (1, 30),   # Baseline
     (2, 30),   # Low Load
-    (5, 60),  # Medium Load
+    (5, 60),   # Medium Load
     (10, 60),  # Heavy Stress
     (20, 120),
     (40, 240),
