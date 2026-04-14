@@ -1,0 +1,33 @@
+stresstest-bucket: ''
+models:
+  llama-3.2-pytorch:
+    endpoint:
+      name: ''
+      id: ''
+      is-dedicated: true
+      name: predict
+    inference:
+      max_model_length: 2048
+      max_new_tokens: 600
+  llama-3.2-vllm:
+    endpoint:
+      name: ''
+      id: ''
+      is-dedicated: true
+      name: predict
+    inference:
+      max_model_length: 2048
+      max_new_tokens: 512
+  llama-3.2-trtllm:
+    endpoint:
+      name: ''
+      id: 
+        europe-west3: ''
+      is-dedicated: true
+      name: predict
+    inference:
+      max_model_length: 2048
+      max_new_tokens: 512
+      inference_batch_size: 64
+      tensor_parallel: 2
+      num_gous: 2
